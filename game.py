@@ -1,5 +1,6 @@
 import pgzrun
 from pgzero.rect import Rect
+import random
 
 WIDTH = 800
 HEIGHT = 600
@@ -10,6 +11,7 @@ PLAYER_SPEED = 4
 JUMP_STRENGTH = -12
 ANIMATION_SPEED = 0.1
 sounds_enabled = True
+game_state = 'playing'  # 'menu' / 'playing' / 'game_over' / 'win'
 
 ##########
 # Classes
@@ -105,22 +107,90 @@ class Platform:
         for tile in self.tiles:
             tile.draw()
 
+class Enemy:
+    def __init__(self, pos, patrol_range):
+        self.rect = Rect(pos, (30, 50)) 
+        self.actor = Actor('enemy_attack_a', anchor=('center', 'bottom'))
+        self.actor.pos = self.rect.centerx, self.rect.bottom
+
+        self.start_x = self.rect.x
+        self.end_x = self.rect.x + patrol_range
+        self.speed = random.uniform(1.0, 2.0)
+        
+        self.animation_frames = ['enemy_attack_a', 'enemy_attack_b']
+        self.current_frame = 0
+        self.animation_timer = 0
+        
+    def update(self):
+        self.rect.x += self.speed
+        if self.rect.right > self.end_x or self.rect.left < self.start_x:
+            self.speed *= -1
+        self.actor.pos = self.rect.centerx, self.rect.bottom
+        
+        # Enemy animation
+        self.animation_timer += 1/60
+        if self.animation_timer > ANIMATION_SPEED * 2:
+            self.animation_timer = 0
+            self.current_frame = (self.current_frame + 1) % len(self.animation_frames)
+            self.actor.image = self.animation_frames[self.current_frame]
+
+    def draw(self):
+        self.actor.draw()
+
 ##########
 # Objects
 ##########
+platforms = []
+enemies = []
 player = Player((50, HEIGHT - 100))
-platforms = [
-    Platform((0, HEIGHT - 40), (WIDTH, 40)) # floor
-]
+goal = Actor('flag', pos=(WIDTH - 50, 60))
+
+
+############
+# Functions
+############
+def setup_level():
+    global platforms, enemies
+    platforms.clear()
+    enemies.clear()
+
+    ground_platform = Platform((0, HEIGHT - 40), (WIDTH, 40))
+    p1 = Platform((175, HEIGHT - 150), (150, 20))
+    p2 = Platform((375, HEIGHT - 250), (200, 20))
+    p3 = Platform((150, HEIGHT - 350), (150, 20))
+    p4 = Platform((400, HEIGHT - 450), (175, 20))
+    goal_platform = Platform((WIDTH - 150, 100), (150, 20))
+    platforms = [ground_platform, p1, p2, p3, p4, goal_platform]
+
+    # Position the player
+    player.rect.x = 50
+    player.rect.bottom = ground_platform.rect.top
+    player.on_ground = True
+    player.velocity_y = 0
+
+    # Position the enemies
+    enemy1 = Enemy(pos=(p2.rect.x + 10, p2.rect.top - 50), patrol_range=160)
+    enemies.append(enemy1)
+    enemy2 = Enemy(pos=(p3.rect.x + 10, p3.rect.top - 50), patrol_range=110)
+    enemies.append(enemy2)
+
+    # Position the goal flag
+    goal.bottom = goal_platform.rect.top
+    goal.centerx = goal_platform.rect.centerx
 
 def draw():
-    """ Desenha tudo na tela. """
-    screen.fill((20, 20, 80)) # dark background
+    screen.fill((20, 20, 80))
+    goal.draw()
     for p in platforms:
         p.draw()
+    for e in enemies:
+        e.draw()
     player.draw()
 
 def update():
     player.update(platforms)
+    for e in enemies:
+        e.update() 
 
+setup_level()
 pgzrun.go()
