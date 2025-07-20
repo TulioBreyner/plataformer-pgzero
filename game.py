@@ -11,7 +11,8 @@ PLAYER_SPEED = 4
 JUMP_STRENGTH = -12
 ANIMATION_SPEED = 0.1
 sounds_enabled = True
-game_state = 'playing'  # 'menu' / 'playing' / 'game_over' / 'win'
+music.set_volume(0.1)
+game_state = 'menu'  # 'menu' / 'playing' / 'game_over' / 'win'
 
 ##########
 # Classes
@@ -137,6 +138,13 @@ class Enemy:
     def draw(self):
         self.actor.draw()
 
+#######
+# Menu
+#######
+play_button = Rect((WIDTH/2 - 100, 250), (200, 50))
+sound_button = Rect((WIDTH/2 - 100, 320), (200, 50))
+exit_button = Rect((WIDTH/2 - 100, 390), (200, 50))
+
 ##########
 # Objects
 ##########
@@ -145,10 +153,40 @@ enemies = []
 player = Player((50, HEIGHT - 100))
 goal = Actor('flag', pos=(WIDTH - 50, 60))
 
-
 ############
 # Functions
 ############
+def draw_menu():
+    screen.fill("black")
+    screen.draw.text("Plataformer Game", center=(WIDTH/2, 150), fontsize=60, color="green")
+    
+    screen.draw.filled_rect(play_button, "darkgreen")
+    screen.draw.text("Start Game", center=play_button.center, fontsize=30)
+    
+    screen.draw.filled_rect(sound_button, "darkblue")
+    sound_text = "Sounds: ON" if sounds_enabled else "Sounds: OFF"
+    screen.draw.text(sound_text, center=sound_button.center, fontsize=30)
+
+    screen.draw.filled_rect(exit_button, "darkred")
+    screen.draw.text("Exit", center=exit_button.center, fontsize=30)
+
+def draw_game():
+    screen.fill((20, 20, 80))
+    goal.draw()
+    for p in platforms:
+        p.draw()
+    for e in enemies:
+        e.draw()
+    player.draw()    
+
+def draw_game_over(win):
+    if win:
+        screen.draw.text("YOU WIN!", center=(WIDTH/2, HEIGHT/2 - 30), fontsize=80, color="gold")
+    else:
+        screen.draw.text("GAME OVER", center=(WIDTH/2, HEIGHT/2 - 30), fontsize=80, color="red")
+        
+    screen.draw.text("Click to return to menu", center=(WIDTH/2, HEIGHT/2 + 40), fontsize=40)
+
 def setup_level():
     global platforms, enemies
     platforms.clear()
@@ -162,35 +200,74 @@ def setup_level():
     goal_platform = Platform((WIDTH - 150, 100), (150, 20))
     platforms = [ground_platform, p1, p2, p3, p4, goal_platform]
 
-    # Position the player
+    # Positions the player
     player.rect.x = 50
     player.rect.bottom = ground_platform.rect.top
     player.on_ground = True
     player.velocity_y = 0
 
-    # Position the enemies
+    # Positions the enemies
     enemy1 = Enemy(pos=(p2.rect.x + 10, p2.rect.top - 50), patrol_range=160)
     enemies.append(enemy1)
     enemy2 = Enemy(pos=(p3.rect.x + 10, p3.rect.top - 50), patrol_range=110)
     enemies.append(enemy2)
+    enemy3 = Enemy(pos=(ground_platform.rect.x + 300, ground_platform.rect.top - 50), patrol_range=450)
+    enemies.append(enemy3)
 
-    # Position the goal flag
+    # Positions the goal flag
     goal.bottom = goal_platform.rect.top
     goal.centerx = goal_platform.rect.centerx
 
 def draw():
-    screen.fill((20, 20, 80))
-    goal.draw()
-    for p in platforms:
-        p.draw()
-    for e in enemies:
-        e.draw()
-    player.draw()
+    if game_state == 'menu':
+        draw_menu()
+    elif game_state == 'playing':
+        draw_game()
+    elif game_state == 'game_over':
+        draw_game_over(win=False)
+    elif game_state == 'win':
+        draw_game_over(win=True)
 
 def update():
-    player.update(platforms)
-    for e in enemies:
-        e.update() 
+    global game_state
+    if game_state == 'playing':
+        player.update(platforms)
+        for e in enemies:
+            e.update()
+
+        # win/gameover conditions
+        if player.actor.colliderect(goal):
+            game_state = 'win'
+            if sounds_enabled:
+                sounds.win.play()
+        for e in enemies:
+            if player.rect.colliderect(e.rect):
+                game_state = 'game_over'
+                if sounds_enabled:
+                    sounds.gameover.play()
+        if player.rect.top > HEIGHT:
+            game_state = 'game_over'
+            if sounds_enabled:
+                sounds.gameover.play()
+
+def on_mouse_down(pos): # mouse clicks on screen
+    global game_state, sounds_enabled
+    if game_state == 'menu':
+        if play_button.collidepoint(pos):
+            game_state = 'playing'
+            setup_level()
+            if sounds_enabled:
+                music.play('background')
+        elif sound_button.collidepoint(pos):
+            sounds_enabled = not sounds_enabled
+            if not sounds_enabled:
+                music.stop()
+            else:
+                music.play("background")
+        elif exit_button.collidepoint(pos):
+            exit()
+    elif game_state in ['game_over', 'win']:
+        game_state = 'menu'
 
 setup_level()
 pgzrun.go()
